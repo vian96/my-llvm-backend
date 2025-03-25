@@ -1,0 +1,12 @@
+#ifndef LLVM_LIB_TARGET_UZHVM_TARGETINFO_UZHVMTARGETINFO_H
+#define LLVM_LIB_TARGET_UZHVM_TARGETINFO_UZHVMTARGETINFO_H
+
+namespace llvm {
+
+class Target;
+
+Target &getTheUzhVMTarget();
+
+} // end namespace llvm
+
+#endif // LLVM_LIB_TARGET_UZHVM_TARGETINFO_UZHVMTARGETINFO_H
