@@ -7,7 +7,7 @@ namespace llvm {
 
 namespace UzhVMOp {
 enum OperandType : unsigned {
-  OPERAND_UZHVMM16 = MCOI::OPERAND_FIRST_TARGET,
+  OPERAND_SIMM16 = MCOI::OPERAND_FIRST_TARGET,
 };
 } // namespace UzhVMOp
 

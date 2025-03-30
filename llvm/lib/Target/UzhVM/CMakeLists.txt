@@ -9,6 +9,7 @@ tablegen(LLVM UzhVMGenMCPseudoLowering.inc -gen-pseudo-lowering)
 tablegen(LLVM UzhVMGenDAGISel.inc -gen-dag-isel)
 tablegen(LLVM UzhVMGenCallingConv.inc -gen-callingconv)
 tablegen(LLVM UzhVMGenAsmWriter.inc -gen-asm-writer)
+tablegen(LLVM UzhVMGenMCCodeEmitter.inc -gen-emitter)
 
 add_public_tablegen_target(UzhVMCommonTableGen)
 
