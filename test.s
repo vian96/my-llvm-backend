@@ -4,7 +4,12 @@
 	.type	main,@function
 main:                                   ; @main
 ; %bb.0:
-	MOVli r9 12
+	MOVli r2 -1
+	MOVli r4 5
+	MOVli r9 4
+	PUTPIXEL r9 r4 r2
+	FLUSH
+	RAND r9
 	BR r0
 .Lfunc_end0:
 	.size	main, .Lfunc_end0-main
