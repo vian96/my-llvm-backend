@@ -15,3 +15,17 @@ using namespace llvm;
 #define DEBUG_TYPE "UzhVM-inst-info"
 
 UzhVMInstrInfo::UzhVMInstrInfo() : UzhVMGenInstrInfo() { UZHVM_DUMP_GREEN }
+
+void UzhVMInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator MBBI,
+                               const DebugLoc &DL, MCRegister DstReg,
+                               MCRegister SrcReg, bool KillSrc,
+                               bool RenamableDest, bool RenamableSrc) const {
+  if (UzhVM::GPRRegClass.contains(DstReg, SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(UzhVM::ORI), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc))
+        .addImm(0);
+    return;
+  }
+  llvm_unreachable("can't copyPhysReg");
+}

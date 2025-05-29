@@ -2,6 +2,12 @@
 // UzhVM profiles and nodes
 //===----------------------------------------------------------------------===//
 
+def SDT_UzhVMBrCC  : SDTypeProfile<0, 2, [ SDTCisVT<0, i32>,
+                                         SDTCisVT<1, OtherVT>]>;
+
+def uzhVM_brcc     : SDNode<"UzhVMISD::BR_CC", SDT_UzhVMBrCC,
+                            [SDNPHasChain]>;
+
 def uzhVM_ret      : SDNode<"UzhVMISD::RET", SDTNone,
                             [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
@@ -15,13 +21,14 @@ include "UzhVMInstrFormats.td"
 // UzhVM Operand, Complex Patterns and Transformations Definitions.
 //===----------------------------------------------------------------------===//
 
+
 class SImmAsmOperand<int width> : AsmOperandClass {
   let Name = "SImm" # width;
   let RenderMethod = "addImmOperands";
   let DiagnosticType = !strconcat("Invalid", Name);
 }
 
-def simm16 : Operand<i32>, ImmLeaf<i32, [{return isInt<16>(Imm);}]> {
+def simm16 : Operand<i32>, ImmLeaf<i32, [{return isUInt<16>(Imm);}]> {
   let ParserMatchClass = SImmAsmOperand<16>;
   let EncoderMethod = "getSImm16OpValue";
   let DecoderMethod = "decodeSImmOperand<16>";
@@ -35,9 +42,37 @@ def simm16 : Operand<i32>, ImmLeaf<i32, [{return isInt<16>(Imm);}]> {
   let OperandNamespace = "UzhVMOp";
 }
 
+def btarget16 : Operand<OtherVT> {
+  let ParserMatchClass = SImmAsmOperand<16>;
+  let PrintMethod = "printBranchOperand";
+  let EncoderMethod = "getBranchTarget16OpValue";
+  let DecoderMethod = "decodeSImmOperand<16>";
+  let MCOperandPredicate = [{
+    int64_t Imm;
+    if (MCOp.evaluateAsConstantImm(Imm))
+      return isInt<16>(Imm);
+    return MCOp.isBareSymbolRef();
+  }];
+  let OperandType = "OPERAND_PCREL";
+}
+
+def LI16 : SDNodeXForm<imm, [{
+  return CurDAG->getTargetConstant((uint64_t)N->getZExtValue() & 0xffff,
+                                  SDLoc(N), MVT::i32);
+}]>;
+
+def HI16 : SDNodeXForm<imm, [{
+  return CurDAG->getTargetConstant((uint64_t)N->getZExtValue() >> 16, SDLoc(N),
+                                  MVT::i32);
+}]>;
 //===----------------------------------------------------------------------===//
 // UzhVM Instructions
 //===----------------------------------------------------------------------===//
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isBarrier = 1, isBranch = 1, isTerminator = 1, r1 = 0, r2 = 0 in
+def B : UzhVMInst<0xB0, (outs), (ins btarget16:$r3_imm), "B $r3_imm",
+                [(br bb:$r3_imm)]>;
+
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCall = 1, isBranch = 1, isTerminator = 1, r2 = 0, r3_imm = 0 in
 def BR : UzhVMInst<0xBA, (outs), (ins GPR:$r1), "BR $r1",
@@ -48,11 +83,42 @@ def PseudoRET : UzhVMPseudoInst<(outs), (ins), "# PseudoRET",
                 [(uzhVM_ret)]>,
                 PseudoInstExpansion<(BR R0)>;
 
+    // TODO:
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def INC_EQi : UzhVMInst<0x90, (outs GPR:$r1, GPR:$r2_), (ins GPR:$r2, simm16:$r3_imm),
+                      "INC_EQi $r1 $r2 $r3_imm", []>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def INC_NEi : UzhVMInst<0x91, (outs GPR:$r1, GPR:$r2_), (ins GPR:$r2, simm16:$r3_imm),
+                      "INC_NEi $r1 $r2 $r3_imm", []>;
+
+let isBranch = 1, isTerminator = 1, r2 = 0 in
+def BR_COND : UzhVMInst<0xBC, (outs), (ins GPR:$r1, btarget16:$r3_imm),
+                      "BR_COND $r1 $r3_imm", [(uzhVM_brcc GPR:$r1, bb:$r3_imm)]>;
+
 // movli
 let isAsCheapAsAMove = 1, isCodeGenOnly = 1, isReMaterializable = 1, r2 = 0 in
 def MOVLI : UzhVMInst<0x11, (outs GPR:$r1), (ins simm16:$r3_imm),
                     "MOVli $r1 $r3_imm",
                     [(set GPR:$r1, simm16:$r3_imm)]>;
+
+// movhi
+let isAsCheapAsAMove = 1, isCodeGenOnly = 1, isReMaterializable = 1, r2 = 0  in
+def MOVHI : UzhVMInst<0xAF, (outs GPR:$r1), (ins simm16:$r3_imm),
+                    "MOVhi $r1 $r3_imm", []>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def ADD : UzhVMInst<0x30, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
+               "ADD $r1 $r2 $r3_imm", [(set GPR:$r1, (add GPR:$r2, GPR:$r3_imm))]>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def MUL : UzhVMInst<0x32, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
+               "MUL $r1 $r2 $r3_imm", [(set GPR:$r1, (mul GPR:$r2, GPR:$r3_imm))]>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+def ORI : UzhVMInst<0x44, (outs GPR:$r1), (ins GPR:$r2, simm16:$r3_imm),
+                  "ORi $r1 $r2 $r3_imm", [(set GPR:$r1, (or GPR:$r2, simm16:$r3_imm))]>;
+
 // flush
 let r1 = 0, r2 = 0, r3_imm = 0 in
 def FLUSH : UzhVMInst<0xF1, (outs), (ins), "FLUSH", [(int_uzhVM_flush)]>;
@@ -65,3 +131,18 @@ def PUTPIXEL : UzhVMInst<0xBB, (outs), (ins GPR:$r1, GPR:$r2, GPR:$r3_imm),
 let isAsCheapAsAMove = 1, isCodeGenOnly = 1, isReMaterializable = 1, r2 = 0, r3_imm = 0 in
 def RAND : UzhVMInst<0x4A, (outs GPR:$r1), (ins),
                       "RAND $r1", [(set GPR:$r1, (int_uzhVM_rand))]>;
+
+//===----------------------------------------------------------------------===//
+// UzhVM Other patterns
+//===----------------------------------------------------------------------===//
+
+def i32hi16 : Operand<i32>, PatLeaf<(i32 imm), [{
+    // i32hi16 predicate - true if the 32-bit immediate has only leftmost 16
+    // bits set.
+    return ((N->getZExtValue() & 0xFFFF0000UL) == N->getZExtValue());}], HI16> {
+}
+
+// i32 imm
+def : Pat<(i32 imm:$r3_imm), (ORI (MOVHI (HI16 imm:$r3_imm)), (LI16 imm:$r3_imm))>;
+def : Pat<(i32 i32hi16:$r3_imm), (MOVHI i32hi16:$r3_imm)>;
+

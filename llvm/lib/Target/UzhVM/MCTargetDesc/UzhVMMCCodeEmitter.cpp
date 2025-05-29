@@ -1,4 +1,5 @@
 #include "MCTargetDesc/UzhVMMCTargetDesc.h"
+#include "MCTargetDesc/UzhVMFixupKinds.h"
 #include "UzhVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -57,6 +58,9 @@ public:
   unsigned getSImm16OpValue(const MCInst &MI, unsigned OpNo,
                             SmallVectorImpl<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
+  unsigned getBranchTarget16OpValue(const MCInst &MI, unsigned OpNo,
+                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    const MCSubtargetInfo &STI) const;
 };
 
 } // end anonymous namespace
@@ -102,14 +106,33 @@ unsigned UzhVMMCCodeEmitter::getSImm16OpValue(const MCInst &MI, unsigned OpNo,
   assert(MO.isExpr() &&
          "getSImm16OpValue expects only expressions or an immediate");
 
-  const MCExpr *Expr = MO.getExpr();
-
-  // Constant value, no fixup is needed
-  if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(Expr))
-    return CE->getValue();
+  Fixups.push_back(
+      MCFixup::create(0, MO.getExpr(), MCFixupKind(UzhVM::fixup_UzhVM_PC16)));
 
   return 0;
 }
+
+/// getBranchTarget16OpValue - Return binary encoding of the branch
+/// target operand. If the machine operand requires relocation,
+/// record the relocation and return zero.
+unsigned
+UzhVMMCCodeEmitter::getBranchTarget16OpValue(const MCInst &MI, unsigned OpNo,
+                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           const MCSubtargetInfo &STI) const {
+  const MCOperand &MO = MI.getOperand(OpNo);
+
+  // If the destination is an immediate, divide by 4.
+  if (MO.isImm())
+    return MO.getImm() / 4;
+
+  assert(MO.isExpr() &&
+         "getBranchTarget16OpValue expects only expressions or immediates");
+
+  Fixups.push_back(
+      MCFixup::create(0, MO.getExpr(), MCFixupKind(UzhVM::fixup_UzhVM_PC16)));
+  return 0;
+}
+
 
 #include "UzhVMGenMCCodeEmitter.inc"
 

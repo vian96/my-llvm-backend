@@ -4,7 +4,8 @@
 	.type	main,@function
 main:                                   ; @main
 ; %bb.0:
-	MOVli r2 -1
+	MOVhi r2 65535
+	ORi r2 r2 65535
 	MOVli r4 5
 	MOVli r9 4
 	PUTPIXEL r9 r4 r2
