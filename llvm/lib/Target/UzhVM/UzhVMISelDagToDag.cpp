@@ -80,6 +80,14 @@ unsigned UzhVMDAGToDAGISel::getOpIncCmp(unsigned Opcode) const {
     return UzhVM::INC_EQi;
   case UzhVMISD::INC_NEi:
     return UzhVM::INC_NEi;
+  case UzhVMISD::INC_LEi:
+    return UzhVM::INC_LEi;
+  case UzhVMISD::INC_LTi:
+    return UzhVM::INC_LTi;
+  case UzhVMISD::INC_GEi:
+    return UzhVM::INC_GEi;
+  case UzhVMISD::INC_GTi:
+    return UzhVM::INC_GTi;
   }
 }
 
@@ -99,7 +107,11 @@ void UzhVMDAGToDAGISel::Select(SDNode *Node) {
     UZHVM_DUMP_MAGENTA
     break;
   case UzhVMISD::INC_EQi:
-  case UzhVMISD::INC_NEi: {
+  case UzhVMISD::INC_NEi:
+  case UzhVMISD::INC_LEi:
+  case UzhVMISD::INC_LTi:
+  case UzhVMISD::INC_GEi:
+  case UzhVMISD::INC_GTi: {
     UZHVM_DUMP_YELLOW
     SDNode *INCCMP = CurDAG->getMachineNode(
         getOpIncCmp(Opcode), DL, {MVT::i32, MVT::i32},

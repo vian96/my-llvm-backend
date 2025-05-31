@@ -65,6 +65,25 @@ def HI16 : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant((uint64_t)N->getZExtValue() >> 16, SDLoc(N),
                                   MVT::i32);
 }]>;
+
+//===----------------------------------------------------------------------===//
+// Instructions specific format
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+class IncCCi<bits<8> op>
+    : UzhVMInst<op, (outs GPR:$r1, GPR:$r2_), (ins GPR:$r2, simm16:$r3_imm),
+              NAME#" $r1 $r2 $r3_imm", []>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+multiclass Arithm<bits<8> opcode, SDPatternOperator op> {
+    def NAME  : UzhVMInst<opcode, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
+                         NAME#" $r1 $r2 $r3_imm",
+                         [(set GPR:$r1, (op GPR:$r2, GPR:$r3_imm))]>;
+    def NAME#I : UzhVMInst<!add(opcode,0x10), (outs GPR:$r1), (ins GPR:$r2, simm16:$r3_imm),
+                         NAME#"i $r1 $r2 $r3_imm",
+                         [(set GPR:$r1, (op GPR:$r2, simm16:$r3_imm))]>;
+}
 //===----------------------------------------------------------------------===//
 // UzhVM Instructions
 //===----------------------------------------------------------------------===//
@@ -83,15 +102,6 @@ def PseudoRET : UzhVMPseudoInst<(outs), (ins), "# PseudoRET",
                 [(uzhVM_ret)]>,
                 PseudoInstExpansion<(BR R0)>;
 
-    // TODO:
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def INC_EQi : UzhVMInst<0x90, (outs GPR:$r1, GPR:$r2_), (ins GPR:$r2, simm16:$r3_imm),
-                      "INC_EQi $r1 $r2 $r3_imm", []>;
-
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def INC_NEi : UzhVMInst<0x91, (outs GPR:$r1, GPR:$r2_), (ins GPR:$r2, simm16:$r3_imm),
-                      "INC_NEi $r1 $r2 $r3_imm", []>;
-
 let isBranch = 1, isTerminator = 1, r2 = 0 in
 def BR_COND : UzhVMInst<0xBC, (outs), (ins GPR:$r1, btarget16:$r3_imm),
                       "BR_COND $r1 $r3_imm", [(uzhVM_brcc GPR:$r1, bb:$r3_imm)]>;
@@ -107,17 +117,28 @@ let isAsCheapAsAMove = 1, isCodeGenOnly = 1, isReMaterializable = 1, r2 = 0  in
 def MOVHI : UzhVMInst<0xAF, (outs GPR:$r1), (ins simm16:$r3_imm),
                     "MOVhi $r1 $r3_imm", []>;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def ADD : UzhVMInst<0x30, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
-               "ADD $r1 $r2 $r3_imm", [(set GPR:$r1, (add GPR:$r2, GPR:$r3_imm))]>;
+def INC_EQi  : IncCCi<0x90>;
+def INC_NEi  : IncCCi<0x91>;
+def INC_LEi  : IncCCi<0x92>;
+def INC_LTi  : IncCCi<0x93>;
+def INC_GEi  : IncCCi<0x94>;
+def INC_GTi  : IncCCi<0x95>;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def MUL : UzhVMInst<0x32, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
-               "MUL $r1 $r2 $r3_imm", [(set GPR:$r1, (mul GPR:$r2, GPR:$r3_imm))]>;
+defm ADD : Arithm<0x30, add>;
+defm SUB : Arithm<0x31, sub>;
+defm MUL : Arithm<0x32, mul>;
+defm DIV : Arithm<0x33, sdiv>;
+defm OR  : Arithm<0x34, or>;
+defm AND : Arithm<0x35, and>;
+defm XOR : Arithm<0x36, xor>;
+defm SRA : Arithm<0x37, sra>;
+defm SRL : Arithm<0x38, srl>;
+defm SHL : Arithm<0x39, shl>;
+defm UREM: Arithm<0x3a, urem>;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def ORI : UzhVMInst<0x44, (outs GPR:$r1), (ins GPR:$r2, simm16:$r3_imm),
-                  "ORi $r1 $r2 $r3_imm", [(set GPR:$r1, (or GPR:$r2, simm16:$r3_imm))]>;
+// abs
+let r3_imm = 0 in
+def ABS : UzhVMInst<0xAB, (outs GPR:$r1), (ins GPR:$r2), "ABS $r1 $r2", [(set GPR:$r1, (abs GPR:$r2))]>;
 
 // flush
 let r1 = 0, r2 = 0, r3_imm = 0 in

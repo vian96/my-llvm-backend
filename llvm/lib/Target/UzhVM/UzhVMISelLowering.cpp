@@ -49,8 +49,19 @@ UzhVMTargetLowering::UzhVMTargetLowering(const TargetMachine &TM,
     setOperationAction(Opc, MVT::i32, Expand);
 
   setOperationAction(ISD::ADD, MVT::i32, Legal);
+  setOperationAction(ISD::SUB, MVT::i32, Legal);
   setOperationAction(ISD::MUL, MVT::i32, Legal);
-  // ...
+
+  setOperationAction(ISD::SDIV, MVT::i32, Legal);
+  setOperationAction(ISD::UREM, MVT::i32, Legal);
+  setOperationAction(ISD::OR, MVT::i32, Legal);
+  setOperationAction(ISD::AND, MVT::i32, Legal);
+  setOperationAction(ISD::XOR, MVT::i32, Legal);
+  setOperationAction(ISD::ABS, MVT::i32, Legal);
+  setOperationAction(ISD::SRA, MVT::i32, Legal);
+  setOperationAction(ISD::SRL, MVT::i32, Legal);
+  setOperationAction(ISD::SHL, MVT::i32, Legal);
+
   setOperationAction(ISD::LOAD, MVT::i32, Legal);
   setOperationAction(ISD::STORE, MVT::i32, Legal);
 
@@ -75,6 +86,14 @@ const char *UzhVMTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "UzhVMISD::INC_EQi";
   case UzhVMISD::INC_NEi:
     return "UzhVMISD::INC_NEi";
+  case UzhVMISD::INC_LEi:
+    return "UzhVMISD::INC_LEi";
+  case UzhVMISD::INC_LTi:
+    return "UzhVMISD::INC_LTi";
+  case UzhVMISD::INC_GEi:
+    return "UzhVMISD::INC_GEi";
+  case UzhVMISD::INC_GTi:
+    return "UzhVMISD::INC_GTi";
   }
   return nullptr;
 }
@@ -621,6 +640,14 @@ unsigned UzhVMTargetLowering::getIsdOpIncCmp(ISD::CondCode CCVal) const {
     return UzhVMISD::INC_EQi;
   case ISD::CondCode::SETNE:
     return UzhVMISD::INC_NEi;
+  case ISD::CondCode::SETLE:
+    return UzhVMISD::INC_LEi;
+  case ISD::CondCode::SETLT:
+    return UzhVMISD::INC_LTi;
+  case ISD::CondCode::SETGE:
+    return UzhVMISD::INC_GEi;
+  case ISD::CondCode::SETGT:
+    return UzhVMISD::INC_GTi;
   }
 }
 
