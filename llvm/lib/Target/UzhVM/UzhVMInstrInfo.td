@@ -187,8 +187,8 @@ def SELECT : UzhVMInst<0x2C, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
 defm MYSETEQ : Arithm<0x50, seteq>;
 defm MYSETULT : Arithm<0x51, setult>;
 defm MYSETLT : Arithm<0x52, setlt>;
-defm MYSETUGT : Arithm<0x53, setgt>;
-defm MYSETGT : Arithm<0x54, setugt>;
+defm MYSETUGT : Arithm<0x53, setugt>;
+defm MYSETGT : Arithm<0x54, setgt>;
 //defm MYSETNEQ : Arithm<0x55, setneq>;
 
 

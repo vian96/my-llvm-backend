@@ -22,10 +22,17 @@ public:
                    bool RenamableSrc = false) const override;
 
   void storeRegToStackSlot(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator I, Register SrcReg,
-                           bool IsKill, int FI, const TargetRegisterClass *RC,
-                           const TargetRegisterInfo *TRI, Register VReg,
-                           MachineInstr::MIFlag Flags) const override {};
+                           MachineBasicBlock::iterator MI, Register SrcReg,
+                           bool isKill, int FrameIndex,
+                           const TargetRegisterClass *RC,
+                           const TargetRegisterInfo *TRI,
+                           Register VReg, MachineInstr::MIFlag miflag) const override;
+
+  void loadRegFromStackSlot(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator MI, Register DestReg,
+                            int FrameIndex, const TargetRegisterClass *RC,
+                            const TargetRegisterInfo *TRI,
+                            Register VReg, MachineInstr::MIFlag miflag) const override;
 };
 
 } // end namespace llvm

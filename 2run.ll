@@ -5,8 +5,6 @@ source_filename = "top"
 ; Function Attrs: noreturn
 define i32 @app() local_unnamed_addr #1 {
 entry:
-  %ans.sroa.0.sroa.0.i10.i = alloca i8, align 4
-  %ans.sroa.0.sroa.0.i = alloca i8, align 4
   br label %0
 
 0:                                                ; preds = %drawLine.exit, %entry
@@ -15,15 +13,12 @@ entry:
   %1 = tail call i32 @llvm.uzhVM.rand()
   %2 = sdiv i32 %x.0, 100
   %3 = sdiv i32 %y.0, 100
-  call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %ans.sroa.0.sroa.0.i)
   %4 = add nsw i32 %2, -700
   %5 = icmp ult i32 %4, -699
   %6 = add nsw i32 %3, -500
   %7 = icmp ult i32 %6, -499
   %8 = or i1 %5, %7
-  %t85 = zext i1 %8 to i8
-  %9 = and i8 %t85, 1
-  %.not = icmp eq i8 %9, 0
+  %.not = icmp eq i1 %8, 0
   br i1 %.not, label %19, label %10
 
 10:                                               ; preds = %0
@@ -72,9 +67,7 @@ entry:
   %43 = add nsw i32 %40, -1
   %44 = icmp ult i32 %43, 499
   %45 = and i1 %42, %44
-  %t455 = zext i1 %45 to i8
-  %46 = and i8 %t455, 1
-  %.not.i = icmp eq i8 %46, 0
+  %.not.i = icmp eq i1 %45, 0
   br i1 %.not.i, label %49, label %47
 
 47:                                               ; preds = %34
