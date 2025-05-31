@@ -62,8 +62,8 @@ UzhVMTargetLowering::UzhVMTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::SRL, MVT::i32, Legal);
   setOperationAction(ISD::SHL, MVT::i32, Legal);
 
-  setOperationAction(ISD::LOAD, MVT::i32, Legal);
-  setOperationAction(ISD::STORE, MVT::i32, Legal);
+  setOperationAction(ISD::LOAD, MVT::i32, Custom);
+  setOperationAction(ISD::STORE, MVT::i32, Custom);
 
   setOperationAction(ISD::Constant, MVT::i32, Legal);
   setOperationAction(ISD::UNDEF, MVT::i32, Legal);
@@ -71,6 +71,16 @@ UzhVMTargetLowering::UzhVMTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BR_CC, MVT::i32, Custom);
 
   setOperationAction(ISD::FRAMEADDR, MVT::i32, Legal);
+
+  setOperationAction(ISD::SELECT, MVT::i32, Custom);
+  setOperationAction(ISD::SELECT_CC, MVT::i32, Expand);
+  setOperationAction(ISD::SELECT, MVT::i1, Custom);
+  setOperationAction(ISD::SELECT_CC, MVT::i1, Expand);
+
+  //setOperationAction(ISD::SETCC, MVT::i1, Custom);
+  //setOperationAction(ISD::SETCC, MVT::i8, Custom);
+  //setOperationAction(ISD::SETCC, MVT::i32, Custom);
+  setOperationAction(ISD::SETCC, MVT::i32, Legal);
 }
 
 const char *UzhVMTargetLowering::getTargetNodeName(unsigned Opcode) const {
@@ -94,6 +104,8 @@ const char *UzhVMTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "UzhVMISD::INC_GEi";
   case UzhVMISD::INC_GTi:
     return "UzhVMISD::INC_GTi";
+  case UzhVMISD::SELECT:
+    return "UzhVMISD::SELECT";
   }
   return nullptr;
 }
@@ -632,9 +644,43 @@ bool UzhVMTargetLowering::isLegalAddressingMode(const DataLayout &DL,
   return true;
 }
 
+static std::string getCondCodeName(ISD::CondCode CC) {
+    switch (CC) {
+        case ISD::SETFALSE: return "SETFALSE";
+        case ISD::SETOEQ:   return "SETOEQ";
+        case ISD::SETOGT:   return "SETOGT";
+        case ISD::SETOGE:   return "SETOGE";
+        case ISD::SETOLT:   return "SETOLT";
+        case ISD::SETOLE:   return "SETOLE";
+        case ISD::SETONE:   return "SETONE";
+        case ISD::SETO:     return "SETO";
+        case ISD::SETUO:    return "SETUO";
+        case ISD::SETUEQ:   return "SETUEQ";
+        case ISD::SETUGT:   return "SETUGT";
+        case ISD::SETUGE:   return "SETUGE";
+        case ISD::SETULT:   return "SETULT";
+        case ISD::SETULE:   return "SETULE";
+        case ISD::SETUNE:   return "SETUNE";
+        case ISD::SETTRUE:  return "SETTRUE";
+        case ISD::SETFALSE2:return "SETFALSE2";
+        case ISD::SETEQ:    return "SETEQ";
+        case ISD::SETGT:    return "SETGT";
+        case ISD::SETGE:    return "SETGE";
+        case ISD::SETLT:    return "SETLT";
+        case ISD::SETLE:    return "SETLE";
+        case ISD::SETNE:    return "SETNE";
+        case ISD::SETTRUE2: return "SETTRUE2";
+        case ISD::SETCC_INVALID: return "SETCC_INVALID";
+        // Add more cases as needed for other CondCode values
+        default: return "UNKNOWN_COND_CODE";
+    }
+}
+
+
 unsigned UzhVMTargetLowering::getIsdOpIncCmp(ISD::CondCode CCVal) const {
   switch (CCVal) {
   default:
+    errs() << getCondCodeName(CCVal) << "IS THE CODE OF VAL CC\n";
     llvm_unreachable("CCVal for INC not implemented");
   case ISD::CondCode::SETEQ:
     return UzhVMISD::INC_EQi;
@@ -642,6 +688,7 @@ unsigned UzhVMTargetLowering::getIsdOpIncCmp(ISD::CondCode CCVal) const {
     return UzhVMISD::INC_NEi;
   case ISD::CondCode::SETLE:
     return UzhVMISD::INC_LEi;
+  case ISD::CondCode::SETULT:
   case ISD::CondCode::SETLT:
     return UzhVMISD::INC_LTi;
   case ISD::CondCode::SETGE:
@@ -652,33 +699,165 @@ unsigned UzhVMTargetLowering::getIsdOpIncCmp(ISD::CondCode CCVal) const {
 }
 
 SDValue UzhVMTargetLowering::lowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+
   // t26: ch = br_cc t22, seteq:ch, t10, Constant:i32<512>,
   // BasicBlock:ch<for.cond.cleanup7>
-  SDValue CC = Op.getOperand(1);
-  SDValue ADD = Op.getOperand(2);
+  SDValue CC = Op.getOperand(1); // which condition?
+  SDValue ADD = Op.getOperand(2); // added arg of cond
   ISD::CondCode CCVal = cast<CondCodeSDNode>(CC)->get();
   if (ADD->getOpcode() == ISD::ADD) {
-    SDValue INC = ADD->getOperand(1);
+    SDValue INC = ADD->getOperand(1); // arg of add
     if (INC->getOpcode() == ISD::Constant &&
         cast<ConstantSDNode>(INC)->getZExtValue() == 1) {
-      SDValue CMP = Op.getOperand(3);
+      SDValue CMP = Op.getOperand(3); // imm arg of cond
       SDValue INCCMP = DAG.getNode(getIsdOpIncCmp(CCVal), ADD,
                                    DAG.getVTList({MVT::i32, MVT::i32}),
-                                   ADD->getOperand(0), CMP);
+                                   ADD->getOperand(0), CMP); // generates instr with increment+comp
       DAG.ReplaceAllUsesWith(ADD, INCCMP.getValue(1));
       DAG.RemoveDeadNode(ADD.getNode());
-      SDValue Block = Op->getOperand(4);
+      SDValue Block = Op->getOperand(4); // block arg of cond
       return DAG.getNode(UzhVMISD::BR_CC, Op, Op.getValueType(), Op.getOperand(0),
                          INCCMP.getValue(0), Block);
     }
   }
-  return Op;
+
+  // a lot of assumes done here, idk what if it breaks...
+  SDValue CMP = Op.getOperand(3); // imm arg of cond
+  // subs 1 from var
+  SDValue SUB = DAG.getNode(ISD::SUB,
+                            ADD, // connects to sub node
+                            MVT::i32,
+                            ADD,
+                            DAG.getConstant(1, DL, MVT::i32)
+                            );
+
+  SDValue INCCMP = DAG.getNode(getIsdOpIncCmp(CCVal),  // get which cond operation of inc_cc
+                               SUB, // previous node
+                               DAG.getVTList({MVT::i32, MVT::i32}), // arg types?
+                               SUB, // val-1 => val
+                               CMP // imm arg of cond
+  ); // generates instr with increment+comp
+
+  SDValue Block = Op->getOperand(4); // block arg of cond
+  return DAG.getNode(UzhVMISD::BR_CC, Op, Op.getValueType(), Op.getOperand(0),
+                     INCCMP.getValue(0), Block);
 }
+
+SDValue UzhVMTargetLowering::lowerSelect(SDValue Op, SelectionDAG &DAG) const {
+  UZHVM_DUMP_RED
+  SDLoc DL(Op);
+  SDValue Cond = Op.getOperand(0);
+  SDValue TrueVal = Op.getOperand(1);
+  SDValue FalseVal = Op.getOperand(2);
+  EVT VT = Op.getValueType();
+
+  if (Cond.getValueType() == MVT::i1)
+    Cond = DAG.getNode(ISD::ZERO_EXTEND, DL, MVT::i32, Cond);
+
+  SDValue CopyToR10 = DAG.getCopyToReg(DAG.getEntryNode(), DL, UzhVM::R10, Cond);
+
+  SmallVector<EVT, 2> ResultTypes;
+  ResultTypes.push_back(VT);
+  ResultTypes.push_back(MVT::Other);
+
+  SmallVector<SDValue, 3> Operands;
+  Operands.push_back(CopyToR10.getValue(0));
+  Operands.push_back(TrueVal);
+  Operands.push_back(FalseVal);
+
+  return DAG.getNode(UzhVMISD::SELECT, DL, ResultTypes, Operands);
+}
+
+SDValue UzhVMTargetLowering::LowerSTORE(SDValue Op, SelectionDAG &DAG) const {
+  UZHVM_DUMP_GREEN
+  SDLoc DL(Op);
+  StoreSDNode *ST = cast<StoreSDNode>(Op);
+  SDValue Chain = ST->getChain();
+  SDValue Value = ST->getValue();
+  SDValue Ptr = ST->getBasePtr();
+  MachineMemOperand *MMO = ST->getMemOperand();
+
+  // If the base pointer is a FrameIndex, we need to lower it.
+  if (FrameIndexSDNode *FIN = dyn_cast<FrameIndexSDNode>(Ptr)) {
+    UZHVM_DUMP_YELLOW
+    const UzhVMRegisterInfo *TRI = static_cast<const UzhVMRegisterInfo*>(STI.getRegisterInfo());
+    Register FrameReg = TRI->getFrameRegister(DAG.getMachineFunction());
+
+    SDValue FPOffset = DAG.getCopyFromReg(Chain, DL, FrameReg, Ptr.getValueType());
+
+    int FI = FIN->getIndex();
+    int Offset = DAG.getMachineFunction().getFrameInfo().getObjectOffset(FI);
+
+    SDValue Addr = DAG.getNode(ISD::ADD, DL, Ptr.getValueType(), FPOffset,
+                               DAG.getConstant(Offset, DL, Ptr.getValueType()));
+
+    return DAG.getStore(Chain, DL, Value, Addr, MMO);
+  }
+
+  return SDValue();
+}
+
+SDValue UzhVMTargetLowering::LowerLOAD(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  LoadSDNode *LD = cast<LoadSDNode>(Op);
+  SDValue Chain = LD->getChain();
+  SDValue Ptr = LD->getBasePtr();
+  MachineMemOperand *MMO = LD->getMemOperand();
+  EVT VT = Op.getValueType();
+
+  if (FrameIndexSDNode *FIN = dyn_cast<FrameIndexSDNode>(Ptr)) {
+    const UzhVMRegisterInfo *TRI = static_cast<const UzhVMRegisterInfo*>(STI.getRegisterInfo());
+    Register FrameReg = TRI->getFrameRegister(DAG.getMachineFunction());
+
+    SDValue FPOffset = DAG.getCopyFromReg(Chain, DL, FrameReg, Ptr.getValueType());
+
+    int FI = FIN->getIndex();
+    int Offset = DAG.getMachineFunction().getFrameInfo().getObjectOffset(FI);
+
+    SDValue Addr = DAG.getNode(ISD::ADD, DL, Ptr.getValueType(), FPOffset,
+                               DAG.getConstant(Offset, DL, Ptr.getValueType()));
+
+    return DAG.getLoad(VT, DL, Chain, Addr, MMO);
+  }
+
+  return SDValue();
+}
+
+
+//SDValue UzhVMTargetLowering::lowerSetCC(SDValue Op, SelectionDAG &DAG) const {
+//  UZHVM_DUMP_CYAN
+//  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(2))->get();
+//  EVT VT = Op.getValueType();
+//
+//  SDValue LHS = Op.getOperand(0);
+//  SDValue RHS = Op.getOperand(1);
+//
+//  SDValue CompareResult;
+//
+//  switch (CC) {
+//    case ISD::SETLT:
+//    case ISD::SETULT:
+//        return DAG.getNode(UzhVMISD::SETLT_IMM, SDLoc(Op), VT, LHS, RHS);
+//    case ISD::SETEQ:
+//        return DAG.getNode(UzhVMISD::SETEQ_IMM, SDLoc(Op), VT, LHS, RHS);
+//    default:
+//      llvm_unreachable("");
+//  }
+//}
 
 SDValue UzhVMTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   switch (Op->getOpcode()) {
   case ISD::BR_CC:
     return lowerBR_CC(Op, DAG);
+  case ISD::LOAD:
+    return LowerLOAD(Op, DAG);
+  case ISD::STORE:
+    return LowerSTORE(Op, DAG);
+  case ISD::SELECT:
+    return lowerSelect(Op, DAG);
+  //case ISD::SETCC:
+  //  return lowerSetCC(Op, DAG);
   default:
     llvm_unreachable("");
   }

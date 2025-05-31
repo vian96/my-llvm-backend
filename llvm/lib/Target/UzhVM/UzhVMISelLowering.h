@@ -24,6 +24,7 @@ enum NodeType : unsigned {
   INC_LTi,
   INC_GEi,
   INC_GTi,
+  SELECT,
 };
 
 } // namespace UzhVMISD
@@ -72,6 +73,10 @@ private:
   /// Provide custom lowering hooks for some operations.
   SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
   SDValue lowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerSelect(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
+  SDValue LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerSetCC(SDValue Op, SelectionDAG &DAG) const;
   unsigned getIsdOpIncCmp(ISD::CondCode CCVal) const;
 };
 

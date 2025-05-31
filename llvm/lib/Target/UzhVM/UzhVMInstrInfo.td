@@ -84,6 +84,7 @@ multiclass Arithm<bits<8> opcode, SDPatternOperator op> {
                          NAME#"i $r1 $r2 $r3_imm",
                          [(set GPR:$r1, (op GPR:$r2, simm16:$r3_imm))]>;
 }
+
 //===----------------------------------------------------------------------===//
 // UzhVM Instructions
 //===----------------------------------------------------------------------===//
@@ -116,6 +117,21 @@ def MOVLI : UzhVMInst<0x11, (outs GPR:$r1), (ins simm16:$r3_imm),
 let isAsCheapAsAMove = 1, isCodeGenOnly = 1, isReMaterializable = 1, r2 = 0  in
 def MOVHI : UzhVMInst<0xAF, (outs GPR:$r1), (ins simm16:$r3_imm),
                     "MOVhi $r1 $r3_imm", []>;
+
+let hasSideEffects = 1, mayStore = 1, r3_imm = 0 in
+def STORER : UzhVMInst<0xA5, (outs), (ins GPR:$r1, GPR:$r2),
+                    "STORE $r1, [$r2]",
+               [(store GPR:$r1, GPR:$r2)]>;
+               //[(store GPR:$r1, (add GPR:$r2, simm16:$r3_imm))]>;
+
+
+let hasSideEffects = 0, mayLoad = 1, r3_imm = 0 in
+def LOADER : UzhVMInst<0xA6, (outs GPR:$r1), (ins GPR:$r2),
+                    "LOAD $r1, [$r2]",
+               [(set GPR:$r1, (load GPR:$r2))]>;
+               //[(set GPR:$r1, (load (add GPR:$r2, simm16:$r3_imm)))]>;
+
+
 
 def INC_EQi  : IncCCi<0x90>;
 def INC_NEi  : IncCCi<0x91>;
@@ -152,6 +168,29 @@ def PUTPIXEL : UzhVMInst<0xBB, (outs), (ins GPR:$r1, GPR:$r2, GPR:$r3_imm),
 let isAsCheapAsAMove = 1, isCodeGenOnly = 1, isReMaterializable = 1, r2 = 0, r3_imm = 0 in
 def RAND : UzhVMInst<0x4A, (outs GPR:$r1), (ins),
                       "RAND $r1", [(set GPR:$r1, (int_uzhVM_rand))]>;
+
+
+// SELECT CRINGE is below
+
+def SDT_UzhVMSelect : SDTypeProfile<1, 2, [SDTCisInt<0>, SDTCisInt<1>, SDTCisInt<2>]>;
+def UzhVMISD_SELECT : SDNode<"UzhVMISD::SELECT", SDT_UzhVMSelect, [SDNPHasChain]>;
+
+let Uses = [R10] in // Implicitly uses R10 as the condition register
+def SELECT : UzhVMInst<0x2C, (outs GPR:$r1), (ins GPR:$r2, GPR:$r3_imm),
+                       "SELECT $r1, $r2, $r3_imm",
+                       //[]>;
+                       [(set GPR:$r1, (UzhVMISD_SELECT GPR:$r2, GPR:$r3_imm))]>;
+
+
+// still select cringe tho it's setcc alreay
+
+defm MYSETEQ : Arithm<0x50, seteq>;
+defm MYSETULT : Arithm<0x51, setult>;
+defm MYSETLT : Arithm<0x52, setlt>;
+defm MYSETUGT : Arithm<0x53, setgt>;
+defm MYSETGT : Arithm<0x54, setugt>;
+//defm MYSETNEQ : Arithm<0x55, setneq>;
+
 
 //===----------------------------------------------------------------------===//
 // UzhVM Other patterns
